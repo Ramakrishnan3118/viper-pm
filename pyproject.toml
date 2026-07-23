@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viper-pm"
+version = "0.1.0"
+description = "Production-grade process manager for Python services on Linux servers"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Adloggs" }]
+keywords = ["process-manager", "supervisor", "daemon", "pm2", "production"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "psutil>=5.9",
+    "click>=8.1",
+    "rich>=13.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+viper = "viper_pm.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Ramakrishnan3118/viper-pm"
+
+[tool.setuptools.packages.find]
+where = ["src"]

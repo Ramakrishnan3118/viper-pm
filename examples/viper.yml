@@ -1,0 +1,10 @@
+# Example viper.yml — keep one of these in each project repo,
+# then deploy with:  git pull && viper apply viper.yml
+apps:
+  - name: heartbeat
+    cmd: python3 heartbeat.py
+    workers: 2
+    max_memory: 200M
+    env:
+      GREETING: hello
+    stop_grace: 5
