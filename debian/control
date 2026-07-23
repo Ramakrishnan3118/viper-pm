@@ -1,0 +1,30 @@
+Source: viper-pm
+Section: admin
+Priority: optional
+Maintainer: Ramakrishnan <ramakrishnan@adloggs.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               pybuild-plugin-pyproject
+Standards-Version: 4.6.2
+Homepage: https://github.com/Ramakrishnan3118/viper-pm
+Rules-Requires-Root: no
+
+Package: viper-pm
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3-psutil,
+         python3-click,
+         python3-rich,
+         python3-yaml
+Description: production-grade process manager for Python services
+ viper keeps long-running Python services alive on Linux servers:
+ start/stop/restart, rolling reload, multi-worker apps, per-worker
+ memory limits with automatic restart, crash auto-restart with
+ exponential backoff, log capture and tailing, and a state journal
+ that lets the daemon re-attach to running apps after a crash.
+ .
+ It only ever manages processes it spawned itself and never
+ interferes with other processes on the system.

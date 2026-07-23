@@ -1,0 +1,128 @@
+# Release pipeline: push a tag like v0.1.0 and this workflow
+#   1. runs the tests
+#   2. publishes the package to PyPI (Trusted Publishing — no token in the repo;
+#      configure once on pypi.org, see docs/RELEASING.md)
+#   3. builds the .deb and attaches it to a GitHub Release
+#   4. publishes/updates the signed apt repository on the gh-pages branch
+#      (requires APT_GPG_PRIVATE_KEY + APT_GPG_KEY_ID secrets; skipped otherwise)
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .[dev]
+      - run: python -m pytest tests/ -v
+
+  pypi:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # PyPI Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  deb:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # attach the .deb to the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Debian build tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            debhelper dh-python python3-all python3-setuptools \
+            pybuild-plugin-pyproject devscripts lintian
+      - name: Build .deb
+        run: |
+          dpkg-buildpackage -us -uc -b
+          mkdir -p out && mv ../viper-pm_*.deb out/
+          lintian out/*.deb || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: out/*.deb
+      - name: Attach .deb to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.deb
+          generate_release_notes: true
+
+  apt-repo:
+    needs: deb
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push the repo to the gh-pages branch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb
+          path: debs
+      - name: Check signing key
+        id: key
+        run: |
+          if [ -n "${{ secrets.APT_GPG_PRIVATE_KEY }}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::APT_GPG_PRIVATE_KEY secret not set — apt repo not published. See docs/RELEASING.md"
+          fi
+      - name: Import GPG key
+        if: steps.key.outputs.present == 'true'
+        run: echo "${{ secrets.APT_GPG_PRIVATE_KEY }}" | gpg --batch --import
+      - name: Fetch existing repo (keep old versions)
+        if: steps.key.outputs.present == 'true'
+        continue-on-error: true   # first release: gh-pages doesn't exist yet
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: repo
+      - name: Build apt repository
+        if: steps.key.outputs.present == 'true'
+        env:
+          KEYID: ${{ secrets.APT_GPG_KEY_ID }}
+        run: |
+          set -e
+          mkdir -p repo/pool/main
+          cp debs/*.deb repo/pool/main/
+          cd repo
+          for arch in amd64 arm64; do
+            mkdir -p dists/stable/main/binary-$arch
+            apt-ftparchive --arch $arch packages pool > dists/stable/main/binary-$arch/Packages
+            gzip -kf dists/stable/main/binary-$arch/Packages
+          done
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=viper-pm \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Components=main \
+            -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
+            release dists/stable > dists/stable/Release
+          gpg --batch --yes -u "$KEYID" --clearsign -o dists/stable/InRelease dists/stable/Release
+          gpg --batch --yes -u "$KEYID" -abs -o dists/stable/Release.gpg dists/stable/Release
+          gpg --batch --armor --export "$KEYID" > gpg.key
+          touch .nojekyll
+      - name: Publish to gh-pages
+        if: steps.key.outputs.present == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./repo
+          commit_message: "apt repo: ${{ github.ref_name }}"

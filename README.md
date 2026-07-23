@@ -25,7 +25,8 @@ slow-loading models and GPU awareness.
 
 ```bash
 pipx install viper-pm        # or: pip install viper-pm
-# apt repository and snap: coming with the first tagged release (see docs/PACKAGING.md)
+# apt (Debian/Ubuntu): see the two-line repo setup in docs/RELEASING.md, then:
+# sudo apt install viper-pm   (installs python3 + all deps automatically)
 ```
 
 From source:

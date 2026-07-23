@@ -1,0 +1,7 @@
+viper-pm (0.1.0) unstable; urgency=medium
+
+  * Initial release: daemon + CLI, multi-worker apps, memory watchdog,
+    crash auto-restart with backoff, daemon re-attach, viper.yml apply,
+    logs/events tailing, save/resurrect.
+
+ -- Ramakrishnan <ramakrishnan@adloggs.com>  Thu, 23 Jul 2026 12:00:00 +0530
